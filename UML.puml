@@ -1,0 +1,32 @@
+@startuml
+skinparam handwritten false
+skinparam monochrome true
+
+title Unified Agentic Framework Architecture
+
+package "UAF: Control Plane" {
+  [initialize_mission]
+  [sync_global_context]
+  [atomic_safe_execute]
+  [self_healing_handover]
+}
+
+package "Reasoning Layer" {
+  [react-programmer]
+  [iterative-refinement]
+}
+
+package "Safety Mesh" {
+  [command-guardrail]
+  [check-security]
+  [smart-powershell]
+}
+
+[initialize_mission] --> [sync_global_context] : creates_session
+[react-programmer] --> [sync_global_context] : stores_learning
+[sync_global_context] --> [iterative-refinement] : provides_context
+[atomic_safe_execute] --> [command-guardrail] : step_1
+[command-guardrail] --> [check-security] : step_2
+[check-security] --> [smart-powershell] : step_3
+
+@enduml
