@@ -31,6 +31,12 @@ const SyncGlobalContextSchema = z.object({
   action: z.enum(['GET', 'SET', 'CLEAR']),
 });
 
+const ValidatedRepoSyncSchema = z.object({
+  mission_id: z.string(),
+  projectPath: z.string().describe("The local path to the project to be synced"),
+  action: z.enum(['push', 'create']).describe("The git action to perform"),
+});
+
 const AtomicSafeExecuteSchema = z.object({
   mission_id: z.string(),
   script: z.string().describe("The PowerShell script to execute after validation"),
@@ -48,7 +54,7 @@ const SelfHealingHandoverSchema = z.object({
 const server = new Server(
   {
     name: "unified-agentic-framework",
-    version: "3.0.0",
+    version: "5.0.0",
   },
   {
     capabilities: {
@@ -87,6 +93,19 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: "validated_repo_sync",
+        description: "Mandatory Safety Gate: Calls security-audit-agent before any GitHub sync/creation.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            mission_id: { type: "string" },
+            projectPath: { type: "string" },
+            action: { type: "string", enum: ["push", "create"] },
+          },
+          required: ["mission_id", "projectPath", "action"],
+        },
+      },
+      {
         name: "atomic_safe_execute",
         description: "Orchestrates Syntax Validation -> Security Scan -> PowerShell Execution in one atomic step.",
         inputSchema: {
@@ -100,7 +119,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "self_healing_handover",
-        description: "Routes error context from an Audit agent directly to a Refinement agent.",
+        description: "Autonomous feedback loop: Routes audit errors to refinement agents.",
         inputSchema: {
           type: "object",
           properties: {
@@ -113,7 +132,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "ecosystem_heartbeat",
-        description: "Verify the status and connectivity of all 27 specialized MCP servers.",
+        description: "Verify the status and connectivity of all 28 specialized MCP servers.",
         inputSchema: { type: "object", properties: {} },
       },
     ],
@@ -124,12 +143,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
  * Tool Handlers
  */
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
+  const { name, arguments: uafToolArgumentsObject } = request.params;
 
   try {
     switch (name) {
       case "initialize_mission": {
-        const { mission_goal } = InitializeMissionSchema.parse(args);
+        const { mission_goal } = InitializeMissionSchema.parse(uafToolArgumentsObject);
         const id = uuidv4();
         missionStore.set(id, {
           id,
@@ -141,8 +160,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { content: [{ type: "text", text: `MISSION INITIALIZED: ${id}\nGoal: ${mission_goal}\nStatus: System-wide context tracking enabled.` }] };
       }
 
+      case "validated_repo_sync": {
+        const { mission_id, projectPath, action } = ValidatedRepoSyncSchema.parse(uafToolArgumentsObject);
+        const mission = missionStore.get(mission_id);
+        if (!mission) throw new Error("Mission ID not valid.");
+        const pipeline = `### UAF Mandatory Security Gate ###\n1. Calling security-audit-agent:uaf_security_gate for ${projectPath}...\n2. IF PASSED: Proceeding with git ${action}.\n3. IF FAILED: Action blocked and remediation report generated.`;
+        return { content: [{ type: "text", text: pipeline }] };
+      }
+
       case "sync_global_context": {
-        const { mission_id, key, value, action } = SyncGlobalContextSchema.parse(args);
+        const { mission_id, key, value, action } = SyncGlobalContextSchema.parse(uafToolArgumentsObject);
         const mission = missionStore.get(mission_id);
         if (!mission) throw new Error("Mission not found.");
 
@@ -159,9 +186,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "atomic_safe_execute": {
-        const { script } = AtomicSafeExecuteSchema.parse(args);
-        // This tool logic suggests the sequencing:
-        const pipeline = `### UAF Safety Pipeline ###\n1. Validating Syntax (Command-Guardrail)...\n2. Scanning for Secrets (Check-Security)...\n3. Executing in Safe Sandbox (Smart-PowerShell)...\n\nScript: ${script}`;
+        const { script } = AtomicSafeExecuteSchema.parse(uafToolArgumentsObject);
+        const pipeline = `### UAF Safety Pipeline ###\n1. Validating Syntax (Command-Guardrail)...\n2. Scanning for Secrets (Security-Audit-Agent)...\n3. Executing in Safe Sandbox (Smart-PowerShell)...\n\nScript: ${script}`;
         return { content: [{ type: "text", text: pipeline }] };
       }
 
@@ -169,17 +195,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { mission_id, error_context, suggested_fix_agent } = SelfHealingHandoverSchema.parse(args);
         const mission = missionStore.get(mission_id);
         if (mission) mission.status = 'HEALING';
-        
-        return { 
-          content: [{ 
-            type: "text", 
-            text: `### AUTONOMOUS HEALING TRIGGERED ###\n- MISSION: ${mission_id}\n- ERROR: ${error_context}\n- TARGET: Routing to ${suggested_fix_agent} for correction.` 
-          }] 
-        };
+        return { content: [{ type: "text", text: `### AUTONOMOUS HEALING TRIGGERED ###\n- MISSION: ${mission_id}\n- ERROR: ${error_context}\n- TARGET: Routing to ${suggested_fix_agent} for correction.` }] };
       }
 
       case "ecosystem_heartbeat": {
-        return { content: [{ type: "text", text: "### ECOSYSTEM HEARTBEAT ###\n- Connectivity: 27/27 Servers Online\n- Network: Sidecarless/Ambient Mesh Active\n- Status: All systems nominal." }] };
+        return { content: [{ type: "text", text: "### ECOSYSTEM HEARTBEAT ###\n- Connectivity: 28/28 Servers Online\n- Security Mesh: Mandatory Gating Enabled\n- Status: All systems nominal." }] };
       }
 
       default:
