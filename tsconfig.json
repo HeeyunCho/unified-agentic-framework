@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "./dist",
+    "rootDir": "./",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowJs": true,
+    "types": ["node"]
+  },
+  "include": ["index.ts", "harness-engine.ts", "plugin-types.ts", "plugins/**/*.ts"],
+  "exclude": ["node_modules", "dist", "* (1).ts", "test_agentic_rag.ts"]
+}
